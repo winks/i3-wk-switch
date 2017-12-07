@@ -9,10 +9,11 @@ import sys
 from pprint import pformat
 import i3
 import time
+import re
 
 
 LOG = logging.getLogger()
-
+PAT = re.compile(r'\s*\d+\s*:.+')
 
 def setup_logger(level):
     """Initializes logger with debug level"""
@@ -48,9 +49,12 @@ def get_workspace(num):
         return want_workspace_cands[0]
 
 
-def switch_workspace(num):
+def switch_workspace(num, name=None):
     """Switches to workspace number"""
-    i3.workspace('number %d' % num)
+    if name is None:
+        i3.workspace('number %d' % num)
+    else:
+        i3.workspace('%d:%s' % (num, name))
 
 
 def swap_visible_workspaces(wk_a, wk_b):
@@ -69,7 +73,10 @@ def change_workspace(num):
     another output, then the workspaces are "shifted" among the outputs.
     """
 
-    # Allow for string or int type for argument
+    if re.match(PAT, num):
+        num, name = map(str.strip, num.split(':'))
+    else:
+        name = None
     num = int(num)
     focused_workspace = get_focused_workspace()
     original_output = focused_workspace['output']
@@ -86,7 +93,7 @@ def change_workspace(num):
     want_workspace = get_workspace(num)
     if want_workspace is None:
         LOG.debug('Switching to workspace because it does not exist, i3 will create it')
-        switch_workspace(num)
+        switch_workspace(num, name)
         return
 
     LOG.debug('Want workspace:\n' + pformat(want_workspace, indent=2))
@@ -104,7 +111,7 @@ def change_workspace(num):
     if focused_workspace['output'] == want_workspace['output']:
         LOG.debug('Wanted workspace already on focused output, '
                   'switching as normal')
-        switch_workspace(num)
+        switch_workspace(num, name)
         return
 
     # Check if wanted workspace is on other output
@@ -112,7 +119,7 @@ def change_workspace(num):
         LOG.debug('Workspace to switch to is hidden')
 
         # Switch to workspace on other output
-        switch_workspace(num)
+        switch_workspace(num, name)
 
     LOG.debug('Wanted workspace is on other output')
 
@@ -120,7 +127,7 @@ def change_workspace(num):
     swap_visible_workspaces(want_workspace, focused_workspace)
 
     # Focus other_workspace
-    switch_workspace(other_workspace['num'])
+    switch_workspace(other_workspace['num'], name)
 
     # Focus on wanted workspace
     time.sleep(.15)
